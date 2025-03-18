@@ -33,7 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _controller = TextEditingController();
   String temperature = 'N/A';
   String cityName = 'Fetching...';
-  List<Map<String, dynamic>> hourlyTemps = [];
+  String weatherCondition = 'Unknown';
   int weatherCode = -1;
 
   @override
@@ -65,7 +65,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (permission == LocationPermission.deniedForever) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location permission permanently denied. Enable it from settings.')),
+          const SnackBar(
+              content: Text(
+                  'Location permission permanently denied. Enable it from settings.')),
         );
         return;
       }
@@ -77,46 +79,6 @@ class _HomeScreenState extends State<HomeScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error fetching location: $e')),
       );
-    }
-  }
-
-  Future<void> _getCityName(double lat, double lon) async {
-    try {
-      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lon);
-      if (placemarks.isNotEmpty) {
-        setState(() {
-          cityName = placemarks.first.locality ?? 'Unknown City';
-        });
-      }
-    } catch (e) {
-      setState(() {
-        cityName = 'Unknown City';
-      });
-    }
-  }
-
-  Future<void> _getWeather(double lat, double lon) async {
-    try {
-      final data = await WeatherService.fetchWeatherByCoords(lat, lon);
-      setState(() {
-        temperature = '${data['current_weather']['temperature']}°C';
-        weatherCode = data['current_weather']['weathercode'];
-
-        List<dynamic> tempList = data['hourly']['temperature_2m'];
-        List<dynamic> timeList = data['hourly']['time'];
-
-        hourlyTemps = List.generate(tempList.length, (index) {
-          return {
-            'time': DateTime.parse(timeList[index]),
-            'temp': tempList[index]
-          };
-        });
-      });
-    } catch (e) {
-      setState(() {
-        temperature = 'Error';
-        weatherCode = -1;
-      });
     }
   }
 
@@ -142,42 +104,96 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Widget getWeatherIcon(int code) {
+  Future<void> _getCityName(double lat, double lon) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(lat, lon);
+      if (placemarks.isNotEmpty) {
+        setState(() {
+          cityName = placemarks.first.locality ?? 'Unknown City';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        cityName = 'Unknown City';
+      });
+    }
+  }
+
+  Future<void> _getWeather(double lat, double lon) async {
+    try {
+      final data = await WeatherService.fetchWeatherByCoords(lat, lon);
+      setState(() {
+        temperature = '${data['current_weather']['temperature']}°C';
+        weatherCode = data['current_weather']['weathercode'];
+        weatherCondition = _getWeatherCondition(weatherCode);
+      });
+    } catch (e) {
+      setState(() {
+        temperature = 'Error';
+        weatherCondition = 'Unknown';
+        weatherCode = -1;
+      });
+    }
+  }
+
+  String _getWeatherCondition(int code) {
     switch (code) {
       case 0:
-        return const BoxedIcon(WeatherIcons.day_sunny, size: 50);
+        return 'Sunny';
       case 1:
       case 2:
       case 3:
-        return const BoxedIcon(WeatherIcons.cloudy, size: 50);
+        return 'Cloudy';
       case 45:
       case 48:
-        return const BoxedIcon(WeatherIcons.fog, size: 50);
+        return 'Foggy';
       case 51:
       case 53:
       case 55:
-        return const BoxedIcon(WeatherIcons.showers, size: 50);
+        return 'Showers';
       case 61:
       case 63:
       case 65:
-        return const BoxedIcon(WeatherIcons.rain, size: 50);
+        return 'Rainy';
       case 80:
       case 81:
       case 82:
-        return const BoxedIcon(WeatherIcons.showers, size: 50);
+        return 'Showers';
       case 95:
       case 96:
       case 99:
-        return const BoxedIcon(WeatherIcons.thunderstorm, size: 50);
+        return 'Thunderstorm';
       default:
-        return const BoxedIcon(WeatherIcons.na, size: 50);
+        return 'Unknown';
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Weather Insights')),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            ClipOval(
+              child: Image.asset(
+                'assets/logo.png',
+                height: 40, // Adjust size as needed
+                width:
+                    40, // Ensure width and height are the same for a perfect circle
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Weather Insights',
+              style: TextStyle(color: Colors.amber),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
+      extendBodyBehindAppBar: true,
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -209,25 +225,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   fillColor: Colors.white.withOpacity(0.7),
                 ),
               ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: () {
-                  String city = _controller.text;
-                  if (city.isNotEmpty) {
-                    _fetchWeatherByCity(city);
-                  }
-                },
-                child: const Text('Search'),
-              ),
               const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _fetchLocationWeather,
-                child: const Text('Get My Location Weather'),
-              ),
-              const SizedBox(height: 20),
-              Text('City: $cityName', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-              const SizedBox(height: 10),
-              Text('Temperature: $temperature', style: const TextStyle(fontSize: 24, color: Colors.white)),
+              Text('City: $cityName',
+                  style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white)),
+              Text('Temperature: $temperature',
+                  style: const TextStyle(fontSize: 24, color: Colors.white)),
+              Text('Condition: $weatherCondition',
+                  style: const TextStyle(fontSize: 20, color: Colors.white)),
             ],
           ),
         ),
