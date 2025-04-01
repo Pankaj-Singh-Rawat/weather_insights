@@ -1,0 +1,1 @@
+ /Users/psrawat/Documents/weather_insights/.dart_tool/flutter_build/39510561cad796d11f684bb555d1372c/native_assets.yaml: 
